@@ -1,0 +1,6 @@
+env: "local"
+storage_url: "postgresql://pics:12345678@localhost:8002/pictures?sslmode=disable"
+http_server:
+  url: "localhost:9991"
+  timeout: 4s
+  idle_timeout: 60s
