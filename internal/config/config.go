@@ -12,12 +12,20 @@ type Config struct {
 	Env        string     `yaml:"env" env-required:"true"`
 	StorageURL string     `yaml:"storage_url" env-required:"true"`
 	HTTPServer HTTPServer `yaml:"http_server" env-required:"true"`
+	Minio      MinIO      `yaml:"minio" env-required:"true"`
 }
 
 type HTTPServer struct {
 	URL         string        `yaml:"url" env-default:"localhost:8080"`
 	Timeout     time.Duration `yaml:"timeout" env-default:"4s"`
 	IdleTimeout time.Duration `yaml:"idle_timeout" env-default:"1s"`
+}
+
+type MinIO struct {
+	Endpoint        string `yaml:"endpoint" env-default:"localhost:9090"`
+	AccessKeyID     string `yaml:"access_key_id" env-required:"true"`
+	SecretAccessKey string `yaml:"secret_access_key" env-required:"true"`
+	BucketName      string `yaml:"bucket_name" env-required:"true"`
 }
 
 func MustLoad() *Config {

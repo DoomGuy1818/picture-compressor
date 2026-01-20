@@ -5,6 +5,7 @@ import (
 	"os"
 	"picCompressor/internal/config"
 	"picCompressor/internal/lib/sl"
+	"picCompressor/internal/object/s3"
 	"picCompressor/internal/storage/pg"
 )
 
@@ -22,7 +23,12 @@ func main() {
 	log.Info("start picture compressor", slog.String("env", cfg.Env))
 	log.Debug("debug messages are enabled!")
 
-	_, err := pg.New(cfg.Env)
+	_, err := s3.New(cfg.Minio.Endpoint, cfg.Minio.AccessKeyID, cfg.Minio.SecretAccessKey, cfg.Minio.BucketName)
+	if err != nil {
+		log.Error("failed to init S3 client", sl.Err(err))
+	}
+
+	_, err = pg.New(cfg.StorageURL)
 	if err != nil {
 		log.Error("failed to initialize storage", sl.Err(err))
 		os.Exit(1)

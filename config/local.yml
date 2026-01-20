@@ -4,3 +4,8 @@ http_server:
   url: "localhost:9991"
   timeout: 4s
   idle_timeout: 60s
+minio:
+  endpoint: "localhost:9090"
+  access_key_id: "admin"
+  secret_access_key: "password"
+  bucket_name: "my-bucket"
