@@ -1,7 +1,9 @@
 package s3
 
 import (
+	"context"
 	"fmt"
+	"os"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -23,7 +25,7 @@ func New(endpoint, accessKeyID, secretAccessKey, bucketName string) (*Minio, err
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", err, op)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return &Minio{
@@ -32,6 +34,45 @@ func New(endpoint, accessKeyID, secretAccessKey, bucketName string) (*Minio, err
 	}, nil
 }
 
-func (m *Minio) PutObject() error {
-	panic("implement me")
+func (m *Minio) CreateBucketWithCheck(ctx context.Context, bucketName string) error {
+	const op = "object.minio.CreateBucketWithCheck"
+	err := m.Client.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{})
+	if err != nil {
+		exists, errBucketExists := m.Client.BucketExists(ctx, bucketName)
+		if errBucketExists == nil && exists {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (m *Minio) PutObject(ctx context.Context, path string) error {
+	const op = "object.minio.PutObject"
+
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	defer file.Close()
+
+	info, err := file.Stat()
+
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	_, err = m.Client.PutObject(
+		ctx, m.BucketName, info.Name(), file, info.Size(), minio.PutObjectOptions{
+			ContentType: "application/octet-stream",
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }

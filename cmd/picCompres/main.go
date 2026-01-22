@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"picCompressor/internal/config"
@@ -16,6 +17,7 @@ const (
 )
 
 func main() {
+	ctx := context.Background()
 	cfg := config.MustLoad()
 
 	log := initLogger(cfg.Env)
@@ -23,9 +25,15 @@ func main() {
 	log.Info("start picture compressor", slog.String("env", cfg.Env))
 	log.Debug("debug messages are enabled!")
 
-	_, err := s3.New(cfg.Minio.Endpoint, cfg.Minio.AccessKeyID, cfg.Minio.SecretAccessKey, cfg.Minio.BucketName)
+	minio, err := s3.New(cfg.Minio.Endpoint, cfg.Minio.AccessKeyID, cfg.Minio.SecretAccessKey, cfg.Minio.BucketName)
 	if err != nil {
 		log.Error("failed to init S3 client", sl.Err(err))
+	}
+
+	if err = minio.CreateBucketWithCheck(ctx, cfg.Minio.BucketName); err != nil {
+		log.Error("failed to init S3 bucket", sl.Err(err))
+	} else {
+		log.Info("bucket has been created!", slog.String("bucket", cfg.Minio.BucketName))
 	}
 
 	_, err = pg.New(cfg.StorageURL)
