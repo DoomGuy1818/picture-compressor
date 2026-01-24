@@ -8,6 +8,9 @@ import (
 	"picCompressor/internal/lib/sl"
 	"picCompressor/internal/object/s3"
 	"picCompressor/internal/storage/pg"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 const (
@@ -32,6 +35,7 @@ func main() {
 
 	if err = minio.CreateBucketWithCheck(ctx, cfg.Minio.BucketName); err != nil {
 		log.Error("failed to init S3 bucket", sl.Err(err))
+		os.Exit(1)
 	} else {
 		log.Info("bucket has been created!", slog.String("bucket", cfg.Minio.BucketName))
 	}
@@ -42,7 +46,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	//TODO: init router
+	initRouter()
 
 	//TODO: run server
 }
@@ -60,4 +64,11 @@ func initLogger(env string) *slog.Logger {
 	}
 
 	return log
+}
+
+func initRouter() {
+	router := chi.NewRouter()
+	router.Use(middleware.RequestID)
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.URLFormat)
 }
