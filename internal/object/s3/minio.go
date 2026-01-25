@@ -39,8 +39,12 @@ func (m *Minio) CreateBucketWithCheck(ctx context.Context, bucketName string) er
 	err := m.Client.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{})
 	if err != nil {
 		exists, errBucketExists := m.Client.BucketExists(ctx, bucketName)
-		if errBucketExists == nil && exists {
+		if errBucketExists != nil {
 			return fmt.Errorf("%s: %w", op, err)
+		}
+
+		if exists {
+			return nil
 		}
 
 		return fmt.Errorf("%s: %w", op, err)
