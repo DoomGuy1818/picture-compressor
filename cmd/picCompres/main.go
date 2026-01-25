@@ -3,11 +3,19 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
 	"picCompressor/internal/config"
+	"picCompressor/internal/http-server/handlers/pictures/compress"
+	"picCompressor/internal/lib/compressor"
+	"picCompressor/internal/lib/compressor/baselib"
 	"picCompressor/internal/lib/sl"
+	vault "picCompressor/internal/object"
 	"picCompressor/internal/object/s3"
 	"picCompressor/internal/storage/pg"
+	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -40,15 +48,50 @@ func main() {
 		log.Info("bucket has been created!", slog.String("bucket", cfg.Minio.BucketName))
 	}
 
-	_, err = pg.New(cfg.StorageURL)
+	str, err := pg.New(cfg.StorageURL)
 	if err != nil {
 		log.Error("failed to initialize storage", sl.Err(err))
 		os.Exit(1)
 	}
 
-	initRouter()
+	compr := baselib.New(10, -1)
 
-	//TODO: run server
+	router := initRouter(log, str, compr, minio)
+
+	log.Info("starting server", slog.String("address", cfg.HTTPServer.URL))
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	srv := &http.Server{
+		Addr:         cfg.HTTPServer.URL,
+		Handler:      router,
+		ReadTimeout:  cfg.HTTPServer.Timeout,
+		WriteTimeout: cfg.HTTPServer.Timeout,
+		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
+	}
+
+	go func() {
+		if err = srv.ListenAndServe(); err != nil {
+			log.Error("failed to start server")
+		}
+	}()
+
+	log.Info("server started")
+
+	<-done
+	log.Info("stopping server")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Error("failed to stop server", sl.Err(err))
+
+		return
+	}
+
+	log.Info("server stopped")
 }
 
 func initLogger(env string) *slog.Logger {
@@ -66,9 +109,22 @@ func initLogger(env string) *slog.Logger {
 	return log
 }
 
-func initRouter() {
+func initRouter(
+	log *slog.Logger,
+	saver compress.PictureSaver,
+	compressor compressor.Compressor,
+	vault vault.SaverInVault,
+) *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
+
+	router.Route(
+		"/compress", func(r chi.Router) {
+			r.Post("/", compress.New(log, saver, compressor, vault))
+		},
+	)
+
+	return router
 }
