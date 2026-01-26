@@ -13,6 +13,8 @@ import (
 	"picCompressor/internal/lib/sl"
 	vault "picCompressor/internal/object"
 	"picCompressor/internal/object/s3"
+	eventSender "picCompressor/internal/services/event-sender"
+	kafkaBroker "picCompressor/internal/services/queue/kafka-broker"
 	"picCompressor/internal/storage/pg"
 	"syscall"
 	"time"
@@ -54,6 +56,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	kafka := kafkaBroker.New(cfg.Kafka.URL, cfg.Kafka.Topic)
+
 	compr := baselib.New(10, -1)
 
 	router := initRouter(log, str, compr, minio)
@@ -70,6 +74,9 @@ func main() {
 		WriteTimeout: cfg.HTTPServer.Timeout,
 		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
 	}
+
+	sender := eventSender.New(str, log, kafka)
+	sender.RunProcessingEvents(context.Background(), 5*time.Second)
 
 	go func() {
 		if err = srv.ListenAndServe(); err != nil {

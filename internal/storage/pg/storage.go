@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"picCompressor/internal/domain/models"
 	"picCompressor/internal/lib/storage"
+	"time"
 
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib" //pg driver init
 )
 
 const pictureSaved = "pictured_saved"
+const ReservationTime = 120 * time.Second
 
 type Storage struct {
 	db *sql.DB
@@ -75,11 +77,14 @@ func (s *Storage) AddPicture(id uuid.UUID, path string) error {
 func (s *Storage) GetNewEvent() (models.Event, error) {
 	const op = "storage.pg.GetNewEvent"
 
-	row := s.db.QueryRow("SELECT id, event_type, payload FROM pictures_events WHERE status = 'new' LIMIT 1")
+	row := s.db.QueryRow("SELECT id, event_type, payload, reserved_to FROM pictures_events WHERE status = 'new' LIMIT 1")
 
-	var evt storage.Event
+	var (
+		evt        storage.Event
+		reservedTo sql.NullTime
+	)
 
-	err := row.Scan(&evt.ID, &evt.Type, &evt.Payload)
+	err := row.Scan(&evt.ID, &evt.Type, &evt.Payload, &reservedTo)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return models.Event{}, nil
@@ -88,10 +93,17 @@ func (s *Storage) GetNewEvent() (models.Event, error) {
 		return models.Event{}, fmt.Errorf("%s: %w", op, err)
 	}
 
+	if reservedTo.Valid {
+		evt.ReservedTo = reservedTo.Time
+	} else {
+		evt.ReservedTo = time.Time{} // zero-value
+	}
+
 	return models.Event{
-		ID:      evt.ID,
-		Type:    evt.Type,
-		Payload: evt.Payload,
+		ID:         evt.ID,
+		Type:       evt.Type,
+		Payload:    evt.Payload,
+		ReservedTo: evt.ReservedTo,
 	}, nil
 }
 
@@ -135,6 +147,19 @@ func (s *Storage) saveEvent(tx *sql.Tx, eventType string, payload string) error 
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
+
+	return nil
+}
+
+func (s *Storage) ReserveTimeForJob(ID uuid.UUID) error {
+	const op = "storage.pg.ReserveTimeForJob"
+
+	stmt, err := s.db.Prepare("UPDATE pictures_events SET reserved_to = $1 WHERE id = $2")
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	_, err = stmt.Exec(time.Now().Add(ReservationTime), ID)
 
 	return nil
 }
