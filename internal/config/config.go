@@ -13,6 +13,7 @@ type Config struct {
 	StorageURL string     `yaml:"storage_url" env-required:"true"`
 	HTTPServer HTTPServer `yaml:"http_server" env-required:"true"`
 	Minio      MinIO      `yaml:"minio" env-required:"true"`
+	Kafka      Kafka      `yaml:"kafka" env-required:"true"`
 }
 
 type HTTPServer struct {
@@ -26,6 +27,11 @@ type MinIO struct {
 	AccessKeyID     string `yaml:"access_key_id" env-required:"true"`
 	SecretAccessKey string `yaml:"secret_access_key" env-required:"true"`
 	BucketName      string `yaml:"bucket_name" env-required:"true"`
+}
+
+type Kafka struct {
+	URL   string `yaml:"url" env-required:"true"`
+	Topic string `yaml:"topic" env-required:"true"`
 }
 
 func MustLoad() *Config {
