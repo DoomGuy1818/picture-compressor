@@ -12,3 +12,4 @@ minio:
 kafka:
   url: "localhost:9092"
   topic: "new-topic"
+  group_id: "new-group"

@@ -11,8 +11,6 @@ import (
 	"picCompressor/internal/lib/compressor"
 	"picCompressor/internal/lib/compressor/baselib"
 	"picCompressor/internal/lib/sl"
-	vault "picCompressor/internal/object"
-	"picCompressor/internal/object/s3"
 	eventSender "picCompressor/internal/services/event-sender"
 	kafkaBroker "picCompressor/internal/services/queue/kafka-broker"
 	"picCompressor/internal/storage/pg"
@@ -38,18 +36,6 @@ func main() {
 	log.Info("start picture compressor", slog.String("env", cfg.Env))
 	log.Debug("debug messages are enabled!")
 
-	minio, err := s3.New(cfg.Minio.Endpoint, cfg.Minio.AccessKeyID, cfg.Minio.SecretAccessKey, cfg.Minio.BucketName)
-	if err != nil {
-		log.Error("failed to init S3 client", sl.Err(err))
-	}
-
-	if err = minio.CreateBucketWithCheck(ctx, cfg.Minio.BucketName); err != nil {
-		log.Error("failed to init S3 bucket", sl.Err(err))
-		os.Exit(1)
-	} else {
-		log.Info("bucket has been created!", slog.String("bucket", cfg.Minio.BucketName))
-	}
-
 	str, err := pg.New(cfg.StorageURL)
 	if err != nil {
 		log.Error("failed to initialize storage", sl.Err(err))
@@ -60,7 +46,7 @@ func main() {
 
 	compr := baselib.New(10, -1)
 
-	router := initRouter(log, str, compr, minio)
+	router := initRouter(log, str, compr)
 
 	log.Info("starting server", slog.String("address", cfg.HTTPServer.URL))
 
@@ -120,7 +106,6 @@ func initRouter(
 	log *slog.Logger,
 	saver compress.PictureSaver,
 	compressor compressor.Compressor,
-	vault vault.SaverInVault,
 ) *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
@@ -129,7 +114,7 @@ func initRouter(
 
 	router.Route(
 		"/compress", func(r chi.Router) {
-			r.Post("/", compress.New(log, saver, compressor, vault))
+			r.Post("/", compress.New(log, saver, compressor))
 		},
 	)
 
