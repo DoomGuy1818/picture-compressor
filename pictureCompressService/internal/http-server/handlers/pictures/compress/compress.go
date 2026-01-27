@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"picCompressor/internal/lib/compressor"
 	"picCompressor/internal/lib/sl"
-	"picCompressor/internal/object"
 
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
@@ -34,7 +33,6 @@ func New(
 	log *slog.Logger,
 	saver PictureSaver,
 	compressor compressor.Compressor,
-	vault object.SaverInVault,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.url.save.New"
@@ -81,12 +79,6 @@ func New(
 		err = saver.AddPicture(id, outFilePath)
 		if err != nil {
 			render.JSON(w, r, Response{Status: http.StatusInternalServerError, Error: "failed to save file"})
-			return
-		}
-
-		err = vault.PutObject(r.Context(), outFilePath)
-		if err != nil {
-			render.JSON(w, r, Response{Status: http.StatusInternalServerError, Error: "failed to save file in vault"})
 			return
 		}
 	}
