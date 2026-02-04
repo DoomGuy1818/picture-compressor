@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"picCompressor/internal/domain/models"
 	"picCompressor/internal/lib/storage"
+	"picCompressor/internal/services/PictureWorker"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -72,6 +74,59 @@ func (s *Storage) AddPicture(id uuid.UUID, path string) error {
 	}
 
 	return nil
+}
+
+func (s *Storage) AddManyPictures(items []PictureWorker.Result) error {
+	const op = "storage.pg.AddManyPictures"
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if len(items) == 0 {
+		return nil
+	}
+
+	var (
+		sb   strings.Builder
+		args []any
+	)
+
+	sb.WriteString(`INSERT INTO pictures (id, file_path) VALUES `)
+
+	for i, p := range items {
+		n := i * 2
+		sb.WriteString(fmt.Sprintf("($%d, $%d)", n+1, n+2))
+		if i < len(items)-1 {
+			sb.WriteString(", ")
+		}
+
+		id, err := uuid.NewV7()
+		if err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
+		args = append(args, id, p.Path)
+	}
+
+	_, err = tx.Exec(sb.String(), args...)
+
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+
 }
 
 func (s *Storage) GetNewEvent() (models.Event, error) {

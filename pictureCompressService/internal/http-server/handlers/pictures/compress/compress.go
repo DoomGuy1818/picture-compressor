@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"picCompressor/internal/lib/compressor"
 	"picCompressor/internal/lib/sl"
+	"picCompressor/internal/services/PictureWorker"
 
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
@@ -27,6 +28,7 @@ type Response struct {
 
 type PictureSaver interface {
 	AddPicture(id uuid.UUID, path string) error
+	AddManyPictures(items []PictureWorker.Result) error
 }
 
 func New(
@@ -35,7 +37,7 @@ func New(
 	compressor compressor.Compressor,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.url.save.New"
+		const op = "handlers.pictures.compress.New"
 
 		log.With(
 			slog.String("op", op),

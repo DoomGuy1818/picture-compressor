@@ -8,9 +8,11 @@ import (
 	"os/signal"
 	"picCompressor/internal/config"
 	"picCompressor/internal/http-server/handlers/pictures/compress"
+	"picCompressor/internal/http-server/handlers/pictures/compressMany"
 	"picCompressor/internal/lib/compressor"
 	"picCompressor/internal/lib/compressor/baselib"
 	"picCompressor/internal/lib/sl"
+	"picCompressor/internal/services/PictureWorker"
 	eventSender "picCompressor/internal/services/event-sender"
 	kafkaBroker "picCompressor/internal/services/queue/kafka-broker"
 	"picCompressor/internal/storage/pg"
@@ -46,7 +48,9 @@ func main() {
 
 	compr := baselib.New(10, -1)
 
-	router := initRouter(log, str, compr)
+	pool := PictureWorker.New(5, compr, log)
+
+	router := initRouter(log, str, compr, pool)
 
 	log.Info("starting server", slog.String("address", cfg.HTTPServer.URL))
 
@@ -62,7 +66,7 @@ func main() {
 	}
 
 	sender := eventSender.New(str, log, kafka)
-	sender.RunProcessingEvents(context.Background(), 5*time.Second)
+	sender.RunProcessingEvents(ctx, 5*time.Second)
 
 	go func() {
 		if err = srv.ListenAndServe(); err != nil {
@@ -106,6 +110,7 @@ func initRouter(
 	log *slog.Logger,
 	saver compress.PictureSaver,
 	compressor compressor.Compressor,
+	pool *PictureWorker.Pool,
 ) *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
@@ -115,6 +120,12 @@ func initRouter(
 	router.Route(
 		"/compress", func(r chi.Router) {
 			r.Post("/", compress.New(log, saver, compressor))
+		},
+	)
+
+	router.Route(
+		"/compressMany", func(r chi.Router) {
+			r.Post("/", compressMany.New(log, saver, pool))
 		},
 	)
 
