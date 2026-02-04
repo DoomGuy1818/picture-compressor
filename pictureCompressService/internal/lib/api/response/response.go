@@ -18,11 +18,16 @@ const (
 )
 
 func Ok() Response {
-	return Response{Status: StatusOk}
+	return Response{
+		Status: StatusOk,
+	}
 }
 
 func Error(msg string) Response {
-	return Response{Status: StatusError, Error: msg}
+	return Response{
+		Status: StatusError,
+		Error:  msg,
+	}
 }
 
 func ValidationError(errs validator.ValidationErrors) Response {
